@@ -962,7 +962,7 @@ uint16_t kuf_glue_square(uint8_t a,
     return s;
 }
 #+END_SRC
-** TODO Breaking Up Squares into Quads
+** Breaking Up Squares into Quads
 The function =kuf_break_square= will break up a square
 into core quads A, B, C, D.
 
@@ -2496,6 +2496,25 @@ void kuf_set_block(int width,
     squares[start + 1] = z;
 }
 #+END_SRC
+
+#+NAME: funcdefs
+#+BEGIN_SRC c
+void kuf_set_square(int width,
+                    uint16_t *squares,
+                    int xpos, int ypos,
+                    uint16_t s);
+#+END_SRC
+
+#+NAME: funcs
+#+BEGIN_SRC c
+void kuf_set_square(int width,
+                    uint16_t *squares,
+                    int xpos, int ypos,
+                    uint16_t s)
+{
+    squares[ypos * width + xpos] = s;
+}
+#+END_SRC
 * Correction Filters
 ** Correcting a Square
 The function =kuf_correct_square= will correct an input
@@ -2512,6 +2531,7 @@ uint16_t kuf_correct_square(uint16_t s);
 uint16_t kuf_correct_square(uint16_t s)
 {
     uint8_t tmp;
+
     <<correct_B>>
     <<correct_BD_S>>
     <<correct_D_S>>
@@ -2748,15 +2768,17 @@ uint8_t kuf_correct_tile(uint8_t q, int pos)
     q = kuf_quad_tile_set(q, pos, tile);
 
     if (!kuf_quad_check(q)) {
-        /* TODO: maybe make it a white spot? */
+        fprintf(stderr, "Oops. Could not correct tile!\n");
     }
 
     return q;
 }
 #+END_SRC
-** Correcting the D Quad of a square
+** Correcting the D + C Quad of a squares
+*** D Quad Correction
 The local function =correct_dquad= will correct quad D in a
-square. This is needed for the larger function =kuf_correct=.
+square. This is needed for the larger function
+=kuf_correct=.
 
 #+NAME: static_funcdefs
 #+BEGIN_SRC c
@@ -2788,6 +2810,49 @@ static uint16_t correct_dquad(uint16_t s)
     q = kuf_square_quad_get(s, KUF_QUAD_D);
     q = kuf_correct_tile(q, KUF_SOUTHEAST);
     s = kuf_square_quad_set(s, KUF_QUAD_D, q);
+
+    if (!kuf_quad_check(q)) {
+        fprintf(stderr, "Oops. Could not correct D quad!\n");
+    }
+
+    return s;
+}
+#+END_SRC
+*** C Quad Correction
+=correct_cquad= works similarly to =correct_dquad=, only
+with the C quad. However, in this scenario it is assumed
+that only A has been corrected, and that the remaining C, B,
+and D quads remain to be corrected.
+
+#+NAME: static_funcdefs
+#+BEGIN_SRC c
+static uint16_t correct_cquad(uint16_t s);
+#+END_SRC
+
+Compared to the D quad corrector, this is has less
+constraints, as it is assumed at this point only
+the A quad has been corrected and locked in place.
+
+Motions here are: AC:S and C:S.
+
+#+NAME: funcs
+#+BEGIN_SRC c
+static uint16_t correct_cquad(uint16_t s)
+{
+    uint8_t q;
+
+    q = kuf_square_quad_get(s, KUF_QUAD_AC);
+    q = kuf_correct_side(q, KUF_SOUTH);
+    s = kuf_square_quad_set(s, KUF_QUAD_AC, q);
+
+    q = kuf_square_quad_get(s, KUF_QUAD_C);
+    q = kuf_correct_side(q, KUF_SOUTH);
+    s = kuf_square_quad_set(s, KUF_QUAD_C, q);
+
+    if (!kuf_quad_check(q)) {
+        fprintf(stderr, "Oops. Could not correct D quad!\n");
+    }
+
     return s;
 }
 #+END_SRC
@@ -2927,6 +2992,10 @@ if (y == 0) {
         <<correct_eastern_wall>>
     }
 } else {
+    if (x == 0) {
+        <<correct_cquad>>
+    }
+
     <<correct_dquad>>
 }
 
@@ -3001,6 +3070,15 @@ correct.
 #+NAME: correct_dquad
 #+BEGIN_SRC c
 cur = correct_dquad(cur);
+#+END_SRC
+
+At the beginning of each row (following the
+first row), the leftmost square must have
+the C quad corrected.
+
+#+NAME: correct_cquad
+#+BEGIN_SRC c
+cur = correct_cquad(cur);
 #+END_SRC
 
 The currently selected square broken up into quad

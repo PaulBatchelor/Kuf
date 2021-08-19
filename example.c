@@ -298,7 +298,47 @@ void gen_correct2(void)
 
     kuf_correct(width, height, sqr);
 
+    printf("writing correct2.pbm\n");
     kuf_write_pbm("correct2.pbm", width, height, sqr);
+}
+
+void gen_bitmask(void)
+{
+    uint16_t sqr[48];
+    int i;
+    int w, h;
+    int pat[4];
+
+    w = 8;
+    h = 6;
+
+    pat[0] = KUF_HPARALLEL_0;
+    pat[1] = KUF_VPARALLEL_0;
+    pat[2] = KUF_HPARALLEL_1;
+    pat[3] = KUF_HPARALLEL_0 | KUF_VPARALLEL_0;
+
+    for (i = 0; i < 48; i++) {
+        sqr[i] = 0;
+    }
+
+    for (i = 0; i < w; i++) {
+        kuf_set_square(w, sqr, i, 0, pat[i % 4]);
+        kuf_set_square(w, sqr, i, h - 1, pat[i % 4]);
+    }
+
+    for (i = 0; i < h; i++) {
+        kuf_set_square(w, sqr, 0, i, pat[i % 4]);
+        kuf_set_square(w, sqr, w - 1, i, pat[i % 4]);
+    }
+
+    kuf_set_square(w, sqr, 1, 1, KUF_CORNER_NORTHWEST);
+    kuf_set_square(w, sqr, w-2, 1, KUF_CORNER_NORTHEAST);
+    kuf_set_square(w, sqr, 1, h-2, KUF_CORNER_SOUTHWEST);
+    kuf_set_square(w, sqr, w-2, h-2, KUF_CORNER_SOUTHEAST);
+
+    kuf_correct(w, h, sqr);
+
+    kuf_write_pbm("bitmask.pbm", w, h, sqr);
 }
 
 int main(int argc, char *argv[])
@@ -340,6 +380,8 @@ int main(int argc, char *argv[])
 
     gen_correct();
     gen_correct2();
+
+    gen_bitmask();
 
     printf("seed: %ld\n", seed);
     return 0;
