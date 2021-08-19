@@ -362,6 +362,99 @@ void gen_bitmask(void)
     kuf_write_pbm("bitmask.pbm", w, h, sqr);
 }
 
+/* try generating a big one ! */
+
+void boxit(uint16_t *sqr, int w, int h, int off)
+{
+    int i;
+    int startx, starty;
+    int endx, endy;
+
+    startx = off;
+    endx = w - off - 1;
+
+    starty = off;
+    endy = h - off - 1;
+
+    kuf_set_square(w, sqr, startx, starty, KUF_CORNER_NORTHWEST);
+    kuf_set_square(w, sqr, endx, starty, KUF_CORNER_NORTHEAST);
+    kuf_set_square(w, sqr, startx, endy, KUF_CORNER_SOUTHWEST);
+    kuf_set_square(w, sqr, endx, endy, KUF_CORNER_SOUTHEAST);
+
+    for (i = startx + 1; i < endx; i++) {
+        kuf_set_square(w, sqr, i, starty, KUF_HPARALLEL_0);
+        kuf_set_square(w, sqr, i, endy, KUF_HPARALLEL_1);
+    }
+
+    for (i = starty + 1; i < endy; i++) {
+        kuf_set_square(w, sqr, startx, i, KUF_VPARALLEL_0);
+        kuf_set_square(w, sqr, endx, i, KUF_VPARALLEL_1);
+    }
+}
+
+void gen_big(void)
+{
+    uint16_t sqr[1024];
+    int i;
+    int w, h;
+    int xp, yp;
+    int pos;
+
+    w = 32;
+    h = 32;
+
+    for (i = 0; i < 1024; i++) {
+        if (i < 512) {
+            if (i % 2) sqr[i] = KUF_HPARALLEL_0;
+            else sqr[i] = KUF_CROSSHATCH_0;
+        } else sqr[i] = KUF_DIAGONAL_0;
+    }
+
+
+    for (yp = h/2; yp < h; yp++) {
+        for (xp = w/2; xp < w; xp++) {
+            kuf_set_square(w, sqr, xp, yp, KUF_VPARALLEL_1);
+        }
+    }
+
+    for (yp = 0; yp < (h/4); yp++) {
+        for (xp = 0; xp < (w/4); xp++) {
+            int run;
+
+            if ((yp % 2) == 0) {
+                run = (xp % 2) == 0;
+            } else {
+            }
+
+
+            if (run) {
+                uint16_t a, b, c, d;
+                int k;
+
+                for (k = 0; k < 3; k++) {
+                    kuf_gen_block(&a, &b, &c, &d);
+                    kuf_set_block(w, sqr, xp*4, yp*4 + 2*k, a, b, c, d);
+
+                    kuf_gen_block(&a, &b, &c, &d);
+                    kuf_set_block(w, sqr, xp*4 + 2, yp*4 + 2*k, a, b, c, d);
+
+                    kuf_gen_block(&a, &b, &c, &d);
+                    kuf_set_block(w, sqr, xp*4 + 4, yp*4 + 2*k, a, b, c, d);
+                }
+            }
+        }
+    }
+
+    boxit(sqr, w, h, 1);
+    boxit(sqr, w, h, 3);
+    boxit(sqr, w, h, 5);
+
+    printf("correcting and writing big\n");
+    kuf_correct(w, h, sqr, NULL);
+
+    kuf_write_pbm("big.pbm", w, h, sqr);
+}
+
 int main(int argc, char *argv[])
 {
     size_t seed;
@@ -403,6 +496,8 @@ int main(int argc, char *argv[])
     gen_correct2();
 
     gen_bitmask();
+
+    gen_big();
 
     printf("seed: %ld\n", seed);
     return 0;

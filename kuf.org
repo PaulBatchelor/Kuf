@@ -2464,6 +2464,14 @@ Labelled by their cardinal position.
     KUF_HLINE_HALF_WEST_1 | \
     KUF_VLINE_HALF_NORTH_1)
 #+END_SRC
+** Diagonals and Crosshatches
+#+NAME: patterns
+#+BEGIN_SRC c
+#define KUF_DIAGONAL_0 0x0660
+#define KUF_DIAGONAL_1 0x9009
+#define KUF_CROSSHATCH_0 0x4664
+#define KUF_CROSSHATCH_1 ~KUF_CROSSHATCH_0
+#+END_SRC
 * Larger Patterns
 Some functions for handling larger patterns.
 
