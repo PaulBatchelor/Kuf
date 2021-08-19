@@ -251,7 +251,7 @@ void gen_correct(void)
     w = x = y = z = 0x6666;
     kuf_set_block(width, sqr, 2, 2, w, x, y, z);
 
-    kuf_correct(width, height, sqr);
+    kuf_correct(width, height, sqr, NULL);
 
     kuf_write_pbm("correct.pbm", width, height, sqr);
 }
@@ -296,7 +296,7 @@ void gen_correct2(void)
     w = x = y = z = KUF_VPARALLEL_0;
     kuf_set_block(width, sqr, 4, 2, w, x, y, z);
 
-    kuf_correct(width, height, sqr);
+    kuf_correct(width, height, sqr, NULL);
 
     printf("writing correct2.pbm\n");
     kuf_write_pbm("correct2.pbm", width, height, sqr);
@@ -308,6 +308,8 @@ void gen_bitmask(void)
     int i;
     int w, h;
     int pat[4];
+    uint8_t bm[6];
+    int x, y;
 
     w = 8;
     h = 6;
@@ -321,6 +323,8 @@ void gen_bitmask(void)
         sqr[i] = 0;
     }
 
+    for (i = 0; i < 6; i++) bm[i] = 0xff;
+
     for (i = 0; i < w; i++) {
         kuf_set_square(w, sqr, i, 0, pat[i % 4]);
         kuf_set_square(w, sqr, i, h - 1, pat[i % 4]);
@@ -329,14 +333,31 @@ void gen_bitmask(void)
     for (i = 0; i < h; i++) {
         kuf_set_square(w, sqr, 0, i, pat[i % 4]);
         kuf_set_square(w, sqr, w - 1, i, pat[i % 4]);
+        /* kuf_set_square(w, sqr, w - 1, i, 0xFFFF); */
     }
 
-    kuf_set_square(w, sqr, 1, 1, KUF_CORNER_NORTHWEST);
-    kuf_set_square(w, sqr, w-2, 1, KUF_CORNER_NORTHEAST);
-    kuf_set_square(w, sqr, 1, h-2, KUF_CORNER_SOUTHWEST);
-    kuf_set_square(w, sqr, w-2, h-2, KUF_CORNER_SOUTHEAST);
+    /* kuf_set_square(w, sqr, 1, 1, KUF_CORNER_NORTHWEST); */
+    /* kuf_set_square(w, sqr, w-2, 1, KUF_CORNER_NORTHEAST); */
+    /* kuf_set_square(w, sqr, 1, h-2, KUF_CORNER_SOUTHWEST); */
+    /* kuf_set_square(w, sqr, w-2, h-2, KUF_CORNER_SOUTHEAST); */
 
-    kuf_correct(w, h, sqr);
+    for (y = 1; y < h - 1; y++) {
+        for (x = 1; x < w - 1; x++) {
+            kuf_bitmask_set(bm, w, x, y, 0);
+        }
+    }
+
+
+    /* test out little pockets of correction */
+
+    kuf_set_square(w, sqr, 3, 3, 0xFFFF);
+    kuf_bitmask_set(bm, w, 3, 3, 1);
+
+    kuf_set_square(w, sqr, 5, 2, 0xFFFF);
+    kuf_bitmask_set(bm, w, 5, 2, 1);
+
+    printf("correcting and writing bitmask\n");
+    kuf_correct(w, h, sqr, bm);
 
     kuf_write_pbm("bitmask.pbm", w, h, sqr);
 }

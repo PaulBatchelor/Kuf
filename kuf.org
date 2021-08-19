@@ -2904,7 +2904,10 @@ static uint16_t correct_eastwall(uint16_t s)
 ** Correcting a large pattern
 The function =kuf_correct= is used apply a kufic
 correction filter on an existing pattern of squares
-configured in an NxM configuration.
+configured in an NxM configuration. An optional bitmask
+=bm= can be supplied as a way to skip over particular
+squares in the matrix. NULL can be supplied here to disable
+it.
 
 The input expects to be a sequence of squares, represented
 as 16-bit integers, lined up one row at a time.
@@ -2915,12 +2918,12 @@ The size of the array should be =n*m=.
 
 #+NAME: funcdefs
 #+BEGIN_SRC c
-void kuf_correct(int n, int m, uint16_t *squares);
+void kuf_correct(int n, int m, uint16_t *squares, uint8_t *bm);
 #+END_SRC
 
 #+NAME: funcs
 #+BEGIN_SRC c
-void kuf_correct(int n, int m, uint16_t *squares)
+void kuf_correct(int n, int m, uint16_t *squares, uint8_t *bm)
 {
     int x, y;
     int movesx;
@@ -2985,6 +2988,8 @@ xodd = x % 2;
 /* construct current square */
 cur = kuf_glue_square(a, b, c, d);
 
+<<check_bitmask>>
+
 if (y == 0) {
     if (x == 0) {
         <<top_left_square>>
@@ -3001,6 +3006,64 @@ if (y == 0) {
 
 <<break_and_update>>
 <<set_AC_quads>>
+#+END_SRC
+
+Before any operations happen, the bitmask is checked.
+A bitmask is only checked on whole squares. If checking
+is disabled in the bitmask, the program moves forward
+and skips the current iteration.
+
+Squares surrounding an ignored square will need to be
+corrected, otherwise there's a chance that they will yield
+invalid quads. Specifically, the leftmost quads of
+neighboring squares. Any square in the top row must
+have A and C of the right neighbor (the eastern wall
+of what would have been the next square), otherwise
+only C is solved (D quad of the next square).
+
+Y-axis movement may not need any adjustment and will
+naturally solve itself. Hang on.
+
+#+NAME: check_bitmask
+#+BEGIN_SRC c
+if (!xodd && !yodd) {
+    if (!kuf_bitmask_get(bm, n, x/2, y/2)) {
+
+        if (kuf_bitmask_get(bm, n, (x/2) + 1, y/2)) {
+            uint16_t *ts;
+            uint8_t ta, tb, tc, td;
+            uint16_t nxt;
+
+            nxt = squares[(y/2)*n + ((x/2) + 1)];
+            nxt =
+                kuf_glue_square(b,
+                                kuf_square_quad_get(nxt,
+                                                    KUF_QUAD_A),
+                                d,
+                                kuf_square_quad_get(nxt,
+                                                    KUF_QUAD_C));
+            if (y == 0) {
+                /* correct eastern wall */
+                nxt = correct_eastwall(nxt);
+            } else {
+                /* correct just the D quad */
+                nxt = correct_dquad(nxt);
+            }
+
+            /* write back into squares */
+            kuf_break_square(nxt, &ta, &tb, &tc, &td);
+
+            ts = &squares[(y/2)*n + ((x/2) + 1)];
+
+            *ts = kuf_square_quad_set(*ts, KUF_QUAD_A, tb);
+            *ts = kuf_square_quad_set(*ts, KUF_QUAD_C, td);
+        }
+
+        kuf_break_square(squares[(y/2)*n + (x/2) + 1], &a, &b, &c, &d);
+        x+=1;
+        continue;
+    }
+}
 #+END_SRC
 
 Inside the loop, the B + D quads of the current square are
@@ -3094,39 +3157,56 @@ the quads across multiple squares.
 kuf_break_square(cur, &a, &b, &c, &d);
 if (xodd) {
     if (yodd) {
+        /* TODO: may not need the array anymore */
+        /* Re-use variable instead */
         uint16_t *ts[4];
 
         ts[0] = &squares[(y / 2) * n + (x / 2)];
-        ts[1] = &squares[(y / 2) * n + ((x / 2) + 1)];
-        ts[2] = &squares[((y / 2) + 1) * n + (x / 2)];
-        ts[3] = &squares[((y / 2) + 1) * n + ((x / 2) + 1)];
-
         *ts[0] = kuf_square_quad_set(*ts[0], KUF_QUAD_D, a);
-        *ts[1] = kuf_square_quad_set(*ts[1], KUF_QUAD_C, b);
-        *ts[2] = kuf_square_quad_set(*ts[2], KUF_QUAD_B, c);
-        *ts[3] = kuf_square_quad_set(*ts[3], KUF_QUAD_A, d);
+
+        if (kuf_bitmask_get(bm, n, (x/2) + 1, (y/2))) {
+            ts[1] = &squares[(y / 2) * n + ((x / 2) + 1)];
+            *ts[1] = kuf_square_quad_set(*ts[1], KUF_QUAD_C, b);
+        }
+
+        if (kuf_bitmask_get(bm, n, (x/2), (y/2) + 1)) {
+            ts[2] = &squares[((y / 2) + 1) * n + (x / 2)];
+            *ts[2] = kuf_square_quad_set(*ts[2], KUF_QUAD_B, c);
+        }
+
+        if (kuf_bitmask_get(bm, n, (x/2) + 1, (y/2) + 1)) {
+            ts[3] = &squares[((y / 2) + 1) * n + ((x / 2) + 1)];
+            *ts[3] = kuf_square_quad_set(*ts[3], KUF_QUAD_A, d);
+        }
     } else {
+        /* TODO: may not need the array anymore */
+        /* Re-use variable instead */
         uint16_t *ts[2];
 
         ts[0] = &squares[(y / 2) * n + (x / 2)];
-        ts[1] = &squares[(y / 2) * n + ((x / 2) + 1)];
-
         *ts[0] = kuf_square_quad_set(*ts[0], KUF_QUAD_B, a);
-        *ts[1] = kuf_square_quad_set(*ts[1], KUF_QUAD_A, b);
         *ts[0] = kuf_square_quad_set(*ts[0], KUF_QUAD_D, c);
-        *ts[1] = kuf_square_quad_set(*ts[1], KUF_QUAD_C, d);
+
+        if (kuf_bitmask_get(bm, n, (x/2) + 1, (y/2))) {
+            ts[1] = &squares[(y / 2) * n + ((x / 2) + 1)];
+            *ts[1] = kuf_square_quad_set(*ts[1], KUF_QUAD_A, b);
+            *ts[1] = kuf_square_quad_set(*ts[1], KUF_QUAD_C, d);
+        }
     }
 } else {
     if (yodd) {
         uint16_t *ts[2];
 
         ts[0] = &squares[(y / 2) * n + (x / 2)];
-        ts[1] = &squares[((y / 2) + 1) * n + (x / 2)];
 
         *ts[0] = kuf_square_quad_set(*ts[0], KUF_QUAD_C, a);
         *ts[0] = kuf_square_quad_set(*ts[0], KUF_QUAD_D, b);
-        *ts[1] = kuf_square_quad_set(*ts[1], KUF_QUAD_A, c);
-        *ts[1] = kuf_square_quad_set(*ts[1], KUF_QUAD_B, d);
+
+        if (kuf_bitmask_get(bm, n, (x/2), (y/2) + 1)) {
+            ts[1] = &squares[((y / 2) + 1) * n + (x / 2)];
+            *ts[1] = kuf_square_quad_set(*ts[1], KUF_QUAD_A, c);
+            *ts[1] = kuf_square_quad_set(*ts[1], KUF_QUAD_B, d);
+        }
     } else {
         uint16_t *ts;
         ts = &squares[((y / 2) * n) + (x / 2)];
@@ -3145,4 +3225,104 @@ The B + D quads of are set to be the A + C quads.
 #+BEGIN_SRC c
 a = b;
 c = d;
+#+END_SRC
+** Bitmasks
+A correction filter can be used with a bitmask
+as a way to explicitely ignore and skip particular
+squares.
+
+A bitmask in kuf is represented as an array of unsigned
+8-bit values. Each bit represents the state of a square. If
+it is in the particular position, it will be subjected to
+correction. If it 0, it is skipped.
+
+The number of bits must be at least the NxM dimension of
+the square tessellation pattern, rounded to the nearest
+byte boundary. This number can be calculated using
+=kuf_bitmask_nbytes=.
+
+#+NAME: funcdefs
+#+BEGIN_SRC c
+int kuf_bitmask_nbytes(int n, int m);
+#+END_SRC
+
+#+NAME: funcs
+#+BEGIN_SRC c
+int kuf_bitmask_nbytes(int n, int m)
+{
+    int nbits;
+    int nbytes;
+
+    nbits = n * m;
+
+    nbytes = nbits / 8;
+
+    if ((nbytes * 8) < nbits) nbytes++;
+
+    return nbytes;
+}
+#+END_SRC
+
+Setting a bit in a bitmask can be done with
+=kuf_bitmask_set=. The n dimension must be supplied.
+
+#+NAME: funcdefs
+#+BEGIN_SRC c
+void kuf_bitmask_set(uint8_t *bm, int n, int x, int y, int s);
+#+END_SRC
+
+#+NAME: funcs
+#+BEGIN_SRC c
+void kuf_bitmask_set(uint8_t *bm, int n, int x, int y, int s)
+{
+    int bitpos;
+    int bytepos;
+    int localpos;
+
+    bitpos = y * n + x;
+    bytepos = bitpos / 8;
+    localpos = bitpos - (bytepos * 8);
+
+    if (s) {
+        bm[bytepos] |= (1 << localpos);
+    } else {
+        bm[bytepos] &= ~(1 << localpos);
+    }
+}
+#+END_SRC
+
+Getting a bit in a bitmask can be done with
+=kuf_bitmask_get=. The N dimension in the NxM square
+matrix must be supplied.
+
+#+NAME: funcdefs
+#+BEGIN_SRC c
+int kuf_bitmask_get(uint8_t *bm, int n, int x, int y);
+#+END_SRC
+
+If =bm= is NULL, this will return 1 by default. This
+behavior has been added to make integration into
+=kuf_correct= more straight forward.
+
+#+NAME: funcs
+#+BEGIN_SRC c
+int kuf_bitmask_get(uint8_t *bm, int n, int x, int y)
+{
+    int s;
+    int bitpos;
+    int bytepos;
+    int localpos;
+
+    if (bm == NULL) return 1;
+
+    s = 0;
+
+    bitpos = y * n + x;
+    bytepos = bitpos / 8;
+    localpos = bitpos - (bytepos * 8);
+
+    s = (bm[bytepos] & (1 << localpos)) > 0;
+
+    return s;
+}
 #+END_SRC
