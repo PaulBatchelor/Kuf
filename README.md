@@ -25,5 +25,5 @@ programs and writes some files in the PBM format. The
 most interesting of these files is currently "correct2.pbm".
 
 As a literate program, the woven kuf program can also be
-consumed online at the [loom](https://pbat.ch/proj/loom).
+consumed online at the [loom](https://pbat.ch/loom/kuf).
 
