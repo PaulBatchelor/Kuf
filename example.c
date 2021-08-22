@@ -398,7 +398,6 @@ void gen_big(void)
     int i;
     int w, h;
     int xp, yp;
-    int pos;
 
     w = 32;
     h = 32;
@@ -421,9 +420,10 @@ void gen_big(void)
         for (xp = 0; xp < (w/4); xp++) {
             int run;
 
+            run = 0;
+
             if ((yp % 2) == 0) {
                 run = (xp % 2) == 0;
-            } else {
             }
 
 
